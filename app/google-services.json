@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "243074876571",
+    "project_id": "sairaj-c8bc5",
+    "storage_bucket": "sairaj-c8bc5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243074876571:android:9955c51e3ecfcde6abb23e",
+        "android_client_info": {
+          "package_name": "com.sairajpatil108.dailyworkout"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "243074876571-0jaah12hk341u52nn9abpj7igrs1io49.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sairajpatil108.dailyworkout",
+            "certificate_hash": "310b72afb25307f833c8e56101a74155b40610cc"
+          }
+        },
+        {
+          "client_id": "243074876571-kq9ovn796u9cb05rpi1j1r5uv9vkhmfn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnmFoBqOm496rSXsqoM746wxF6i7hIMVw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "243074876571-kq9ovn796u9cb05rpi1j1r5uv9vkhmfn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
