@@ -20,19 +20,12 @@ import com.sairajpatil108.dailyworkout.ViewModel.*
 import com.sairajpatil108.dailyworkout.Presentation.*
 
 class MainActivity : ComponentActivity() {
-	private lateinit var database: WorkoutDatabase
-	private lateinit var repository: WorkoutRepository
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		
-		// Initialize database and repository
-		database = WorkoutDatabase.getDatabase(applicationContext)
-		repository = WorkoutRepository(
-			workoutSessionDao = database.workoutSessionDao(),
-			exerciseProgressDao = database.exerciseProgressDao(),
-			userStatsDao = database.userStatsDao()
-		)
+		// Get repository from application
+		val repository = (application as WorkoutApplication).repository
 		
 		enableEdgeToEdge()
 		setContent {
