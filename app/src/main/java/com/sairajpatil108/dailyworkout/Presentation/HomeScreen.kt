@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sairajpatil108.dailyworkout.ViewModel.*
 import com.sairajpatil108.dailyworkout.data.*
 import com.sairajpatil108.dailyworkout.ui.theme.*
+import com.sairajpatil108.dailyworkout.Presentation.components.UserAvatar
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -33,10 +34,12 @@ import java.util.*
 fun HomeScreen(
     workoutViewModel: WorkoutViewModel = viewModel(),
     progressViewModel: ProgressViewModel = viewModel(),
+    authViewModel: com.sairajpatil108.dailyworkout.ViewModel.AuthViewModel,
     onNavigateToWorkout: () -> Unit,
     onNavigateToProgress: () -> Unit,
     onNavigateToDashboard: () -> Unit = {},
-    onNavigateToExerciseDetail: (Exercise) -> Unit
+    onNavigateToExerciseDetail: (Exercise) -> Unit,
+    onSignOut: () -> Unit
 ) {
     val workoutUiState by workoutViewModel.uiState.collectAsState()
     val currentSession by workoutViewModel.currentSession.collectAsState()
@@ -47,12 +50,15 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(20.dp),
+            .padding(top = 20.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             // Modern Header with gradient background
-            ModernHeaderSection()
+            ModernHeaderSection(
+                user = authViewModel.authState.user,
+                onSignOut = onSignOut
+            )
         }
 
         item {
@@ -125,7 +131,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ModernHeaderSection() {
+private fun ModernHeaderSection(
+    user: com.google.firebase.auth.FirebaseUser?,
+    onSignOut: () -> Unit
+) {
     val currentDate = remember {
         SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault()).format(Date())
     }
@@ -151,19 +160,57 @@ private fun ModernHeaderSection() {
                 )
                 .padding(24.dp)
         ) {
-            Column {
-                Text(
-                    text = "Good morning! 💪",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = currentDate,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Good morning${user?.displayName?.let { ", ${it.split(" ").firstOrNull()}" } ?: ""}! 💪",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = currentDate,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // User profile and sign out
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // User Avatar with Profile Photo
+                    UserAvatar(
+                        user = user,
+                        size = 52.dp,
+                        showBorder = true
+                    )
+                    
+                    // Sign out button
+                    IconButton(
+                        onClick = onSignOut,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.errorContainer,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .size(52.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Sign Out",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         }
     }
@@ -577,6 +624,7 @@ private fun ModernActiveWorkoutContent(
                     text = "$exerciseCount exercises planned",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 

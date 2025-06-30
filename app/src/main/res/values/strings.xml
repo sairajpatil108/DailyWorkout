@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">DailyWorkout</string>
+    <string name="default_web_client_id">
+        243074876571-kq9ovn796u9cb05rpi1j1r5uv9vkhmfn.apps.googleusercontent.com</string>
 </resources>

@@ -2,6 +2,7 @@ package com.sairajpatil108.dailyworkout.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -91,14 +92,35 @@ class WorkoutRepository(
 
     // Stats and Streaks
     suspend fun getUserStats(): UserStats {
-        return userStatsDao.getUserStats() ?: UserStats()
+        return userStatsDao.getUserStats() ?: run {
+            // Initialize default stats for first-time users
+            val defaultStats = UserStats()
+            userStatsDao.insertOrUpdateStats(defaultStats)
+            defaultStats
+        }
     }
 
     fun getUserStatsFlow(): Flow<UserStats?> {
-        return userStatsDao.getUserStatsFlow()
+        return userStatsDao.getUserStatsFlow().map { stats ->
+            stats ?: run {
+                // Ensure stats exist
+                initializeUserStatsIfNeeded()
+                UserStats()
+            }
+        }
+    }
+
+    suspend fun initializeUserStatsIfNeeded() {
+        if (userStatsDao.getUserStats() == null) {
+            val defaultStats = UserStats()
+            userStatsDao.insertOrUpdateStats(defaultStats)
+        }
     }
 
     private suspend fun updateUserStats() {
+        // Ensure stats exist first
+        initializeUserStatsIfNeeded()
+        
         val currentStats = getUserStats()
         val completedWorkouts = workoutSessionDao.getCompletedWorkoutCount()
         val streak = calculateCurrentStreak()
@@ -111,20 +133,21 @@ class WorkoutRepository(
         )
         
         userStatsDao.insertOrUpdateStats(updatedStats)
+        
+        // Debug logging
+        println("DEBUG: Updated UserStats - Current Streak: ${updatedStats.currentStreak}, Longest Streak: ${updatedStats.longestStreak}, Total Workouts: ${updatedStats.totalWorkouts}")
     }
 
     private suspend fun calculateCurrentStreak(): Int {
         var streak = 0
         val calendar = Calendar.getInstance()
         
-        // Start checking from yesterday (since today's workout might just be completed)
-        calendar.add(Calendar.DAY_OF_YEAR, -1)
-        
+        // Start checking from today (including today's workout)
         while (true) {
             val dateString = dateFormat.format(calendar.time)
             val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(calendar.time)
             
-            // Skip Sunday (rest day)
+            // Skip Sunday (rest day) - don't break streak, just skip
             if (dayOfWeek == "Sunday") {
                 calendar.add(Calendar.DAY_OF_YEAR, -1)
                 continue
@@ -135,7 +158,23 @@ class WorkoutRepository(
                 streak++
                 calendar.add(Calendar.DAY_OF_YEAR, -1)
             } else {
-                break
+                // If it's today and no session exists yet, don't break the streak
+                val today = dateFormat.format(Date())
+                if (dateString == today && session == null) {
+                    // Today's session might not exist yet, check if it's a workout day
+                    val exercises = getExercisesForDay(dayOfWeek)
+                    if (exercises.isNotEmpty()) {
+                        // It's a workout day but no session created yet, streak should break
+                        break
+                    } else {
+                        // It's not a workout day, continue checking previous days
+                        calendar.add(Calendar.DAY_OF_YEAR, -1)
+                        continue
+                    }
+                } else {
+                    // Found an incomplete workout day, streak is broken
+                    break
+                }
             }
         }
         
@@ -163,5 +202,40 @@ class WorkoutRepository(
         }
         
         return weekProgress
+    }
+
+    // Test/Debug methods
+    suspend fun testCompleteWorkout(daysAgo: Int = 0) {
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.DAY_OF_YEAR, -daysAgo)
+        
+        val date = dateFormat.format(calendar.time)
+        val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(calendar.time)
+        
+        // Skip Sunday
+        if (dayOfWeek == "Sunday") return
+        
+        val exercises = getExercisesForDay(dayOfWeek)
+        if (exercises.isEmpty()) return
+        
+        val session = WorkoutSession(
+            date = date,
+            dayOfWeek = dayOfWeek,
+            isCompleted = true,
+            completedExercises = exercises.size,
+            totalExercises = exercises.size,
+            duration = 45L // 45 minutes
+        )
+        
+        workoutSessionDao.insertSession(session)
+        updateUserStats()
+        
+        println("DEBUG: Test workout completed for $dayOfWeek ($date)")
+    }
+
+    suspend fun getDebugStreakInfo(): String {
+        val stats = getUserStats()
+        val streak = calculateCurrentStreak()
+        return "Current Streak: ${stats.currentStreak}, Calculated Streak: $streak, Longest: ${stats.longestStreak}, Total Workouts: ${stats.totalWorkouts}"
     }
 } 

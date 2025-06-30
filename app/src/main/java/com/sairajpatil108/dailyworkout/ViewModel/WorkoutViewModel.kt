@@ -31,6 +31,17 @@ class WorkoutViewModel(
 
     init {
         loadTodaysWorkout()
+        initializeUserStats()
+    }
+
+    private fun initializeUserStats() {
+        viewModelScope.launch {
+            try {
+                repository.initializeUserStatsIfNeeded()
+            } catch (e: Exception) {
+                // Handle initialization error silently
+            }
+        }
     }
 
     private fun loadTodaysWorkout() {
@@ -149,6 +160,20 @@ class WorkoutViewModel(
                 isWorkoutCompleted = true,
                 workoutDuration = duration
             )
+            
+            // Force refresh stats to ensure streaks are updated immediately
+            refreshStats()
+        }
+    }
+
+    private fun refreshStats() {
+        viewModelScope.launch {
+            try {
+                // This will trigger the UserStats flow to update
+                repository.getUserStats()
+            } catch (e: Exception) {
+                // Handle error silently
+            }
         }
     }
 

@@ -3,6 +3,7 @@ plugins {
 	alias(libs.plugins.kotlin.android)
 	alias(libs.plugins.kotlin.compose)
 	id("kotlin-kapt")
+	id("com.google.gms.google-services")
 }
 
 android {
@@ -69,6 +70,17 @@ dependencies {
 	
 	// Material Icons Extended
 	implementation("androidx.compose.material:material-icons-extended:1.5.4")
+	
+	// Firebase
+	implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+	implementation("com.google.firebase:firebase-auth-ktx")
+	implementation("com.google.firebase:firebase-analytics-ktx")
+	
+	// Google Sign-In
+	implementation("com.google.android.gms:play-services-auth:20.7.0")
+	
+	// Image loading
+	implementation("io.coil-kt:coil-compose:2.5.0")
 	
 	testImplementation(libs.junit)
 	androidTestImplementation(libs.androidx.junit)

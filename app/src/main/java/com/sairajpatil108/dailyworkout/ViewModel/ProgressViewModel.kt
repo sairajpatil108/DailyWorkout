@@ -20,8 +20,55 @@ class ProgressViewModel(
     val allSessions: StateFlow<List<WorkoutSession>> = repository.getAllSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
+    // Reactive weekly progress that updates automatically
+    val weeklyProgress: StateFlow<Map<String, Boolean>> = flow {
+        while (true) {
+            emit(repository.getWeeklyProgress())
+            kotlinx.coroutines.delay(1000) // Check every second for updates
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyMap())
+
+    // Reactive weekly completion rate
+    val weeklyCompletionRate: StateFlow<Float> = weeklyProgress.map { progress ->
+        val completedDays = progress.values.count { it }
+        val totalDays = progress.size
+        if (totalDays > 0) completedDays.toFloat() / totalDays else 0f
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0f)
+
+    // Reactive monthly stats
+    val monthlyStats: StateFlow<MonthlyStats> = allSessions.map { sessions ->
+        calculateMonthlyStats(sessions)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), MonthlyStats())
+
+    // Reactive workout frequency
+    val workoutFrequency: StateFlow<List<DayFrequency>> = allSessions.map { sessions ->
+        calculateWorkoutFrequency(sessions)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
+
+    // Reactive streak info
+    val streakInfo: StateFlow<StreakInfo> = userStats.map { stats ->
+        stats?.let {
+            StreakInfo(
+                currentStreak = it.currentStreak,
+                longestStreak = it.longestStreak,
+                isOnStreak = it.currentStreak > 0
+            )
+        } ?: StreakInfo()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), StreakInfo())
+
     init {
         loadProgressData()
+        // Refresh data periodically to ensure UI stays updated
+        startPeriodicRefresh()
+    }
+
+    private fun startPeriodicRefresh() {
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(30000) // Refresh every 30 seconds
+                refreshData()
+            }
+        }
     }
 
     private fun loadProgressData() {
@@ -29,12 +76,11 @@ class ProgressViewModel(
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
                 
-                val weeklyProgress = repository.getWeeklyProgress()
-                val recentSessions = repository.getAllSessions().first().take(7)
+                // Initial load - reactive flows will handle updates automatically
+                val initialWeeklyProgress = repository.getWeeklyProgress()
                 
                 _uiState.value = _uiState.value.copy(
-                    weeklyProgress = weeklyProgress,
-                    recentSessions = recentSessions,
+                    weeklyProgress = initialWeeklyProgress,
                     isLoading = false
                 )
                 
@@ -47,20 +93,16 @@ class ProgressViewModel(
         }
     }
 
-    fun getWeeklyCompletionRate(): Float {
-        val progress = _uiState.value.weeklyProgress
-        val completedDays = progress.values.count { it }
-        val totalDays = progress.size
-        return if (totalDays > 0) completedDays.toFloat() / totalDays else 0f
-    }
-
-    fun getMonthlyStats(): MonthlyStats {
-        val sessions = allSessions.value
+    private fun calculateMonthlyStats(sessions: List<WorkoutSession>): MonthlyStats {
         val currentMonth = java.time.YearMonth.now()
         
         val monthSessions = sessions.filter { session ->
-            val sessionDate = java.time.LocalDate.parse(session.date)
-            sessionDate.year == currentMonth.year && sessionDate.monthValue == currentMonth.monthValue
+            try {
+                val sessionDate = java.time.LocalDate.parse(session.date)
+                sessionDate.year == currentMonth.year && sessionDate.monthValue == currentMonth.monthValue
+            } catch (e: Exception) {
+                false
+            }
         }
         
         val completedSessions = monthSessions.filter { it.isCompleted }
@@ -80,17 +122,7 @@ class ProgressViewModel(
         )
     }
 
-    fun getStreakInfo(): StreakInfo {
-        val stats = userStats.value ?: return StreakInfo()
-        return StreakInfo(
-            currentStreak = stats.currentStreak,
-            longestStreak = stats.longestStreak,
-            isOnStreak = stats.currentStreak > 0
-        )
-    }
-
-    fun getWorkoutFrequency(): List<DayFrequency> {
-        val sessions = allSessions.value
+    private fun calculateWorkoutFrequency(sessions: List<WorkoutSession>): List<DayFrequency> {
         val dayFrequency = mutableMapOf<String, Int>()
         
         sessions.filter { it.isCompleted }.forEach { session ->
@@ -106,6 +138,12 @@ class ProgressViewModel(
             }
     }
 
+    // Legacy methods for backward compatibility (will use reactive flows internally)
+    fun getWeeklyCompletionRate(): Float = weeklyCompletionRate.value
+    fun getMonthlyStats(): MonthlyStats = monthlyStats.value
+    fun getWorkoutFrequency(): List<DayFrequency> = workoutFrequency.value
+    fun getStreakInfo(): StreakInfo = streakInfo.value
+
     fun refreshData() {
         loadProgressData()
     }
@@ -118,7 +156,6 @@ class ProgressViewModel(
 data class ProgressUiState(
     val isLoading: Boolean = false,
     val weeklyProgress: Map<String, Boolean> = emptyMap(),
-    val recentSessions: List<WorkoutSession> = emptyList(),
     val error: String? = null
 )
 

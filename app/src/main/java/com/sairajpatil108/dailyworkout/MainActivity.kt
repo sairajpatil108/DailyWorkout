@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WorkoutApp(repository: WorkoutRepository) {
 	val navController = rememberNavController()
+	val authViewModel: AuthViewModel = viewModel()
 	
 	// Create ViewModels with repository
 	val workoutViewModel: WorkoutViewModel = viewModel(
@@ -53,6 +54,7 @@ fun WorkoutApp(repository: WorkoutRepository) {
 	) { innerPadding ->
 		WorkoutNavHost(
 			navController = navController,
+			authViewModel = authViewModel,
 			workoutViewModel = workoutViewModel,
 			progressViewModel = progressViewModel,
 			modifier = Modifier.padding(innerPadding)
@@ -63,21 +65,38 @@ fun WorkoutApp(repository: WorkoutRepository) {
 @Composable
 fun WorkoutNavHost(
 	navController: NavHostController,
+	authViewModel: AuthViewModel,
 	workoutViewModel: WorkoutViewModel,
 	progressViewModel: ProgressViewModel,
 	modifier: Modifier = Modifier
 ) {
 	var selectedExercise by remember { mutableStateOf<Exercise?>(null) }
+	val authState = authViewModel.authState
+
+	// Determine start destination based on authentication state
+	val startDestination = if (authState.isSignedIn) "home" else "login"
 
 	NavHost(
 		navController = navController,
-		startDestination = "home",
+		startDestination = startDestination,
 		modifier = modifier
 	) {
+		composable("login") {
+			LoginScreen(
+				authViewModel = authViewModel,
+				onSignInSuccess = {
+					navController.navigate("home") {
+						popUpTo("login") { inclusive = true }
+					}
+				}
+			)
+		}
+		
 		composable("home") {
 			HomeScreen(
 				workoutViewModel = workoutViewModel,
 				progressViewModel = progressViewModel,
+				authViewModel = authViewModel,
 				onNavigateToWorkout = {
 					navController.navigate("workout")
 				},
@@ -90,6 +109,12 @@ fun WorkoutNavHost(
 				onNavigateToExerciseDetail = { exercise ->
 					selectedExercise = exercise
 					navController.navigate("exercise_detail")
+				},
+				onSignOut = {
+					authViewModel.signOut()
+					navController.navigate("login") {
+						popUpTo("home") { inclusive = true }
+					}
 				}
 			)
 		}

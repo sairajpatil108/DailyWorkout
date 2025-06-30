@@ -3,7 +3,6 @@ package com.sairajpatil108.dailyworkout.Presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,11 +15,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sairajpatil108.dailyworkout.ViewModel.*
 import com.sairajpatil108.dailyworkout.data.*
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +29,13 @@ fun ProgressScreen(
 ) {
     val progressUiState by progressViewModel.uiState.collectAsState()
     val userStats by progressViewModel.userStats.collectAsState()
-    val allSessions by progressViewModel.allSessions.collectAsState()
+    
+    // Use reactive StateFlows for real-time updates
+    val weeklyProgress by progressViewModel.weeklyProgress.collectAsState()
+    val weeklyCompletionRate by progressViewModel.weeklyCompletionRate.collectAsState()
+    val monthlyStats by progressViewModel.monthlyStats.collectAsState()
+    val workoutFrequency by progressViewModel.workoutFrequency.collectAsState()
+    val streakInfo by progressViewModel.streakInfo.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -77,42 +81,28 @@ fun ProgressScreen(
 
                 item {
                     // Streak information
-                    val streakInfo = progressViewModel.getStreakInfo()
                     StreakCard(streakInfo = streakInfo)
                 }
 
                 item {
-                    // Weekly progress
+                    // Weekly progress - now reactive
                     WeeklyProgressCard(
-                        weeklyProgress = progressUiState.weeklyProgress,
-                        completionRate = progressViewModel.getWeeklyCompletionRate()
+                        weeklyProgress = weeklyProgress,
+                        completionRate = weeklyCompletionRate
                     )
                 }
 
                 item {
-                    // Monthly stats
-                    val monthlyStats = progressViewModel.getMonthlyStats()
+                    // Monthly stats - now reactive
                     MonthlyStatsCard(monthlyStats = monthlyStats)
                 }
 
                 item {
-                    // Workout frequency
-                    val workoutFrequency = progressViewModel.getWorkoutFrequency()
+                    // Workout frequency - now reactive
                     WorkoutFrequencyCard(frequency = workoutFrequency)
                 }
 
-                item {
-                    Text(
-                        text = "Recent Workouts",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                items(progressUiState.recentSessions) { session ->
-                    WorkoutSessionCard(session = session)
-                }
-
+                // Error handling
                 progressUiState.error?.let { error ->
                     item {
                         ErrorCard(
@@ -409,6 +399,7 @@ private fun WorkoutFrequencyCard(frequency: List<DayFrequency>) {
                 ) {
                     Text(
                         text = dayFreq.day,
+                        fontSize = 11.sp,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.width(80.dp)
                     )
@@ -430,49 +421,6 @@ private fun WorkoutFrequencyCard(frequency: List<DayFrequency>) {
                         textAlign = TextAlign.End
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkoutSessionCard(session: WorkoutSession) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (session.isCompleted) Color(0xFFE8F5E8) else MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (session.isCompleted) Icons.Default.CheckCircle else Icons.Default.Schedule,
-                contentDescription = if (session.isCompleted) "Completed" else "Scheduled",
-                tint = if (session.isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${session.dayOfWeek} - ${formatDate(session.date)}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (session.isCompleted) {
-                        "${session.completedExercises}/${session.totalExercises} exercises • ${session.duration}min"
-                    } else {
-                        "${session.completedExercises}/${session.totalExercises} exercises completed"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
@@ -513,16 +461,5 @@ private fun ErrorCard(
                 )
             }
         }
-    }
-}
-
-private fun formatDate(dateString: String): String {
-    return try {
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val outputFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
-        val date = inputFormat.parse(dateString)
-        outputFormat.format(date ?: Date())
-    } catch (e: Exception) {
-        dateString
     }
 } 
