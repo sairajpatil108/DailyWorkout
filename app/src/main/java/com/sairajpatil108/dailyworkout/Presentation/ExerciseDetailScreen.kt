@@ -1,5 +1,7 @@
 package com.sairajpatil108.dailyworkout.Presentation
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,12 +12,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sairajpatil108.dailyworkout.ViewModel.*
 import com.sairajpatil108.dailyworkout.data.*
 import com.sairajpatil108.dailyworkout.Presentation.components.*
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +41,7 @@ fun ExerciseDetailScreen(
     ) {
         // Top App Bar
         TopAppBar(
+
             title = { Text("Exercise Guide") },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
@@ -57,7 +62,7 @@ fun ExerciseDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding( horizontal = 10.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -104,9 +109,9 @@ fun ExerciseDetailScreen(
                 exerciseName = exercise.exerciseName
             )
 
-            // Tutorial videos section (placeholder)
-            if (exercise.tutorialVideos.isNotEmpty()) {
-                TutorialVideosCard(videos = exercise.tutorialVideos)
+            // Tutorial video section
+            exercise.tutorialVideoUrl?.let { videoUrl ->
+                TutorialVideoCard(videoUrl = videoUrl)
             }
 
             // Complete exercise button
@@ -216,10 +221,16 @@ private fun InfoCard(
 
 @Composable
 private fun DosCard(dos: List<String>) {
+    val isDarkTheme = isSystemInDarkTheme()
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFE8F5E8)
+            containerColor = if (isDarkTheme) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                Color(0xFFE8F5E8)
+            }
         )
     ) {
         Column(
@@ -232,14 +243,22 @@ private fun DosCard(dos: List<String>) {
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Do's",
                     modifier = Modifier.size(24.dp),
-                    tint = Color(0xFF4CAF50)
+                    tint = if (isDarkTheme) {
+                        Color(0xFF4AE07B)
+                    } else {
+                        Color(0xFF4CAF50)
+                    }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Do's ✅",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2E7D32)
+                    color = if (isDarkTheme) {
+                        Color(0xFF4AE07B)
+                    } else {
+                        Color(0xFF2E7D32)
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -250,12 +269,17 @@ private fun DosCard(dos: List<String>) {
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4CAF50),
+                        color = if (isDarkTheme) {
+                            Color(0xFF4AE07B)
+                        } else {
+                            Color(0xFF4CAF50)
+                        },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
                         text = item,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -266,10 +290,16 @@ private fun DosCard(dos: List<String>) {
 
 @Composable
 private fun DontsCard(donts: List<String>) {
+    val isDarkTheme = isSystemInDarkTheme()
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFEE8E8)
+            containerColor = if (isDarkTheme) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                Color(0xFFFEE8E8)
+            }
         )
     ) {
         Column(
@@ -282,14 +312,22 @@ private fun DontsCard(donts: List<String>) {
                     imageVector = Icons.Default.Cancel,
                     contentDescription = "Don'ts",
                     modifier = Modifier.size(24.dp),
-                    tint = Color(0xFFF44336)
+                    tint = if (isDarkTheme) {
+                        Color(0xFFFF8A8A)
+                    } else {
+                        Color(0xFFF44336)
+                    }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Don'ts ❌",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD32F2F)
+                    color = if (isDarkTheme) {
+                        Color(0xFFFF8A8A)
+                    } else {
+                        Color(0xFFD32F2F)
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -300,12 +338,17 @@ private fun DontsCard(donts: List<String>) {
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFF44336),
+                        color = if (isDarkTheme) {
+                            Color(0xFFFF8A8A)
+                        } else {
+                            Color(0xFFF44336)
+                        },
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
                         text = item,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -372,9 +415,18 @@ private fun RecentProgressCard(
 }
 
 @Composable
-private fun TutorialVideosCard(videos: List<String>) {
+private fun TutorialVideoCard(videoUrl: String) {
+    val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
+    
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isDarkTheme) 8.dp else 4.dp
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -384,23 +436,69 @@ private fun TutorialVideosCard(videos: List<String>) {
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayCircleOutline,
-                    contentDescription = "Videos",
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    contentDescription = "Video Tutorial",
+                    modifier = Modifier.size(28.dp),
+                    tint = if (isDarkTheme) {
+                        Color(0xFFFF6B6B)
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Tutorial Videos",
+                    text = "Video Tutorial",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            
             Text(
-                text = "Video tutorials will be available in future updates.",
+                text = "Watch a detailed video tutorial for proper form and technique.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
+            
+            // Watch video button
+            Button(
+                onClick = {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        // Handle error (invalid URL, no app to handle video, etc.)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDarkTheme) {
+                        Color(0xFFFF6B6B)
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
+                    contentColor = if (isDarkTheme) {
+                        Color(0xFF000000)
+                    } else {
+                        MaterialTheme.colorScheme.onTertiary
+                    }
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = if (isDarkTheme) 6.dp else 2.dp
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Watch Tutorial Video",
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 } 

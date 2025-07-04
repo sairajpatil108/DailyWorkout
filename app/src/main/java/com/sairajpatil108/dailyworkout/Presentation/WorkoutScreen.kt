@@ -115,10 +115,37 @@ fun WorkoutScreen(
 
                 item {
                     // Complete workout button
-                    if (exerciseProgress.count { it.isCompleted } == workoutUiState.todaysExercises.size &&
-                        workoutUiState.todaysExercises.isNotEmpty()) {
+                    val completedExercises = exerciseProgress.count { it.isCompleted }
+                    val totalExercises = workoutUiState.todaysExercises.size
+                    val canComplete = completedExercises == totalExercises && totalExercises > 0
+                    
+                    if (canComplete) {
                         CompleteWorkoutButton {
                             workoutViewModel.completeWorkout()
+                        }
+                    } else {
+                        // Show progress info when not all exercises are completed
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    text = "Progress: $completedExercises/$totalExercises exercises completed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (totalExercises > 0) {
+                                    Text(
+                                        text = "Complete all exercises to finish your workout",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }

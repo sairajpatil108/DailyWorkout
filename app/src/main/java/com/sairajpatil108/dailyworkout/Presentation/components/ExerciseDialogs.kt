@@ -130,8 +130,8 @@ fun ExerciseCompletionDialog(
     onDismiss: () -> Unit,
     onComplete: (Int, Int, Float, String) -> Unit
 ) {
-    var sets by remember { mutableStateOf(exercise.sets) }
-    var reps by remember { mutableStateOf(exercise.reps.split("-").first()) }
+    var setsText by remember { mutableStateOf(exercise.sets.toString()) }
+    var repsText by remember { mutableStateOf(exercise.reps.toString()) }
     var weight by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     
@@ -176,15 +176,15 @@ fun ExerciseCompletionDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
-                        value = sets,
-                        onValueChange = { sets = it },
+                        value = setsText,
+                        onValueChange = { setsText = it },
                         label = { Text("Sets") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
-                        value = reps,
-                        onValueChange = { reps = it },
+                        value = repsText,
+                        onValueChange = { repsText = it },
                         label = { Text("Reps") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
@@ -226,8 +226,8 @@ fun ExerciseCompletionDialog(
                     }
                     Button(
                         onClick = {
-                            val setsInt = sets.toIntOrNull() ?: 0
-                            val repsInt = reps.toIntOrNull() ?: 0
+                            val setsInt = setsText.toIntOrNull() ?: 0
+                            val repsInt = repsText.toIntOrNull() ?: 0
                             val weightFloat = weight.toFloatOrNull() ?: 0f
                             if (setsInt > 0 && repsInt > 0) {
                                 onComplete(setsInt, repsInt, weightFloat, notes.trim())

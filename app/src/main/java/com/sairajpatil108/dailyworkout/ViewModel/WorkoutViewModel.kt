@@ -29,6 +29,9 @@ class WorkoutViewModel(
     private val _isWorkoutActive = MutableStateFlow(false)
     val isWorkoutActive: StateFlow<Boolean> = _isWorkoutActive.asStateFlow()
 
+    // Callback for when workout is completed to notify other view models
+    var onWorkoutCompleted: (() -> Unit)? = null
+
     init {
         loadTodaysWorkout()
         initializeUserStats()
@@ -95,74 +98,102 @@ class WorkoutViewModel(
 
     fun completeExercise(exerciseName: String, sets: Int, reps: Int, weight: Float, notes: String = "") {
         viewModelScope.launch {
-            val session = _currentSession.value ?: return@launch
-            val exercise = _uiState.value.todaysExercises.find { it.exerciseName == exerciseName }
-                ?: return@launch
+            try {
+                val session = _currentSession.value ?: return@launch
+                val exercise = _uiState.value.todaysExercises.find { it.exerciseName == exerciseName }
+                    ?: return@launch
 
-            val progress = ExerciseProgress(
-                sessionId = session.id,
-                exerciseName = exerciseName,
-                setsCompleted = sets,
-                totalSets = exercise.sets.toIntOrNull() ?: 3,
-                weight = weight,
-                reps = reps,
-                isCompleted = true,
-                notes = notes
-            )
 
-            repository.updateExerciseProgress(progress)
-            
-            // Update local progress
-            val currentProgress = _exerciseProgress.value.toMutableList()
-            val existingIndex = currentProgress.indexOfFirst { 
-                it.exerciseName == exerciseName && it.sessionId == session.id 
-            }
-            
-            if (existingIndex >= 0) {
-                currentProgress[existingIndex] = progress
-            } else {
-                currentProgress.add(progress)
-            }
-            
-            _exerciseProgress.value = currentProgress
 
-            // Update session progress
-            val completedCount = currentProgress.count { it.isCompleted }
-            val updatedSession = session.copy(completedExercises = completedCount)
-            repository.updateSession(updatedSession)
-            _currentSession.value = updatedSession
+                val progress = ExerciseProgress(
+                    sessionId = session.id,
+                    exerciseName = exerciseName,
+                    setsCompleted = sets,
+                    totalSets = exercise.sets,
+                    weight = weight,
+                    reps = reps,
+                    isCompleted = true,
+                    notes = notes
+                )
 
-            // Move to next exercise if available
-            if (_currentExerciseIndex.value < _uiState.value.todaysExercises.size - 1) {
-                _currentExerciseIndex.value += 1
+                repository.updateExerciseProgress(progress)
+                
+                // Update local progress
+                val currentProgress = _exerciseProgress.value.toMutableList()
+                val existingIndex = currentProgress.indexOfFirst { 
+                    it.exerciseName == exerciseName && it.sessionId == session.id 
+                }
+                
+                if (existingIndex >= 0) {
+                    currentProgress[existingIndex] = progress
+                } else {
+                    currentProgress.add(progress)
+                }
+                
+                _exerciseProgress.value = currentProgress
+
+                // Update session progress
+                val completedCount = currentProgress.count { it.isCompleted }
+                val updatedSession = session.copy(completedExercises = completedCount)
+                repository.updateSession(updatedSession)
+                _currentSession.value = updatedSession
+
+                // Move to next exercise if available
+                if (_currentExerciseIndex.value < _uiState.value.todaysExercises.size - 1) {
+                    _currentExerciseIndex.value += 1
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to complete exercise: ${e.message}"
+                )
             }
         }
     }
 
     fun completeWorkout() {
         viewModelScope.launch {
-            val session = _currentSession.value ?: return@launch
-            val startTime = _workoutTimer.value
-            val duration = (System.currentTimeMillis() - startTime) / 1000 / 60 // Convert to minutes
+            try {
+                val session = _currentSession.value ?: return@launch
+                val startTime = _workoutTimer.value
+                val currentTime = System.currentTimeMillis()
+                
+                // Calculate duration in minutes, with a minimum of 1 minute
+                val duration = if (startTime > 0) {
+                    maxOf(1L, (currentTime - startTime) / 1000 / 60) // Convert to minutes
+                } else {
+                    1L // Default to 1 minute if timer wasn't started
+                }
 
-            repository.completeWorkout(session.id, duration)
-            
-            val completedSession = session.copy(
-                isCompleted = true,
-                duration = duration,
-                completedExercises = _uiState.value.todaysExercises.size
-            )
-            
-            _currentSession.value = completedSession
-            _isWorkoutActive.value = false
-            
-            _uiState.value = _uiState.value.copy(
-                isWorkoutCompleted = true,
-                workoutDuration = duration
-            )
-            
-            // Force refresh stats to ensure streaks are updated immediately
-            refreshStats()
+
+                
+                // Complete the workout in the repository
+                repository.completeWorkout(session.id, duration)
+                
+                val completedSession = session.copy(
+                    isCompleted = true,
+                    duration = duration,
+                    completedExercises = _uiState.value.todaysExercises.size
+                )
+                
+                _currentSession.value = completedSession
+                _isWorkoutActive.value = false
+                
+                _uiState.value = _uiState.value.copy(
+                    isWorkoutCompleted = true,
+                    workoutDuration = duration
+                )
+                
+                // Force refresh stats to ensure streaks are updated immediately
+                refreshStats()
+                
+                // Notify other components (like ProgressViewModel) that workout was completed
+                onWorkoutCompleted?.invoke()
+                
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to complete workout: ${e.message}"
+                )
+            }
         }
     }
 

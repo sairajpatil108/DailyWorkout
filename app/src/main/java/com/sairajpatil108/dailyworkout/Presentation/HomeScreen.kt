@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sairajpatil108.dailyworkout.ViewModel.*
 import com.sairajpatil108.dailyworkout.data.*
@@ -28,6 +29,7 @@ import com.sairajpatil108.dailyworkout.ui.theme.*
 import com.sairajpatil108.dailyworkout.Presentation.components.UserAvatar
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +47,29 @@ fun HomeScreen(
     val currentSession by workoutViewModel.currentSession.collectAsState()
     val userStats by progressViewModel.userStats.collectAsState()
     val progressUiState by progressViewModel.uiState.collectAsState()
+    val weeklyProgress by progressViewModel.weeklyProgress.collectAsState()
+
+    // Memoize expensive calculations
+    val currentDate = remember {
+        SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault()).format(Date())
+    }
+    
+    // Memoize gradient brush to avoid recreation
+    val headerGradient = remember {
+        Brush.horizontalGradient(
+            colors = listOf(
+                PrimaryPurple.copy(alpha = 0.1f),
+                LimeGreen.copy(alpha = 0.1f)
+            )
+        )
+    }
+
+    // Set up callback to refresh progress when workout is completed
+    LaunchedEffect(Unit) {
+        workoutViewModel.onWorkoutCompleted = {
+            progressViewModel.forceRefreshWeeklyProgress()
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -53,27 +78,29 @@ fun HomeScreen(
             .padding(top = 20.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        item {
+        item(key = "header") {
             // Modern Header with gradient background
             ModernHeaderSection(
                 user = authViewModel.authState.user,
+                currentDate = currentDate,
+                headerGradient = headerGradient,
                 onSignOut = onSignOut
             )
         }
 
-        item {
+        item(key = "hero_stats") {
             // Hero Stats Card with glassmorphism effect
             userStats?.let { stats ->
                 HeroStatsCard(
                     stats = stats,
-                    weeklyProgress = progressUiState.weeklyProgress,
+                    weeklyProgress = weeklyProgress,
                     onProgressClick = onNavigateToProgress,
                     onDashboardClick = onNavigateToDashboard
                 )
             }
         }
 
-        item {
+        item(key = "workout_card") {
             // Today's workout status with modern design
             ModernWorkoutCard(
                 workoutUiState = workoutUiState,
@@ -83,7 +110,7 @@ fun HomeScreen(
         }
 
         if (!workoutUiState.isRestDay && workoutUiState.todaysExercises.isNotEmpty()) {
-            item {
+            item(key = "exercises_header") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -111,7 +138,10 @@ fun HomeScreen(
                 }
             }
 
-            items(workoutUiState.todaysExercises) { exercise ->
+            items(
+                items = workoutUiState.todaysExercises,
+                key = { exercise -> exercise.exerciseName }
+            ) { exercise ->
                 ModernExerciseCard(
                     exercise = exercise,
                     onClick = { onNavigateToExerciseDetail(exercise) }
@@ -120,7 +150,7 @@ fun HomeScreen(
         }
 
         workoutUiState.error?.let { error ->
-            item {
+            item(key = "error") {
                 ModernErrorCard(
                     error = error,
                     onDismiss = { workoutViewModel.clearError() }
@@ -133,10 +163,15 @@ fun HomeScreen(
 @Composable
 private fun ModernHeaderSection(
     user: com.google.firebase.auth.FirebaseUser?,
+    currentDate: String,
+    headerGradient: Brush,
     onSignOut: () -> Unit
 ) {
-    val currentDate = remember {
-        SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault()).format(Date())
+    var showProfileDialog by remember { mutableStateOf(false) }
+    
+    // Memoize greeting text to avoid recalculation
+    val greetingText = remember(user?.displayName) {
+        "Good morning${user?.displayName?.let { ", ${it.split(" ").firstOrNull()}" } ?: ""}! 💪"
     }
     
     Card(
@@ -150,12 +185,7 @@ private fun ModernHeaderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            PrimaryPurple.copy(alpha = 0.1f),
-                            LimeGreen.copy(alpha = 0.1f)
-                        )
-                    ),
+                    headerGradient,
                     shape = RoundedCornerShape(16.dp)
                 )
                 .padding(24.dp)
@@ -169,7 +199,7 @@ private fun ModernHeaderSection(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "Good morning${user?.displayName?.let { ", ${it.split(" ").firstOrNull()}" } ?: ""}! 💪",
+                        text = greetingText,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -182,37 +212,27 @@ private fun ModernHeaderSection(
                     )
                 }
                 
-                // User profile and sign out
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // User Avatar with Profile Photo
-                    UserAvatar(
-                        user = user,
-                        size = 52.dp,
-                        showBorder = true
-                    )
-                    
-                    // Sign out button
-                    IconButton(
-                        onClick = onSignOut,
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.errorContainer,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .size(52.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Logout,
-                            contentDescription = "Sign Out",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+                // Clickable User Avatar that opens profile dialog
+                UserAvatar(
+                    user = user,
+                    size = 52.dp,
+                    showBorder = true,
+                    onClick = { showProfileDialog = true }
+                )
             }
         }
+    }
+    
+    // Profile Dialog
+    if (showProfileDialog) {
+        ProfileDialog(
+            user = user,
+            onDismiss = { showProfileDialog = false },
+            onSignOut = {
+                showProfileDialog = false
+                onSignOut()
+            }
+        )
     }
 }
 
@@ -332,7 +352,7 @@ private fun HeroStatsCard(
             Spacer(modifier = Modifier.height(20.dp))
             
             // Weekly progress indicator
-            ModernWeeklyProgress(weeklyProgress)
+            OptimizedWeeklyProgress(weeklyProgress)
         }
     }
 }
@@ -392,7 +412,23 @@ private fun ModernStatItem(
 }
 
 @Composable
-private fun ModernWeeklyProgress(weeklyProgress: Map<String, Boolean>) {
+private fun OptimizedWeeklyProgress(weeklyProgress: Map<String, Boolean>) {
+    // Memoize expensive calculations to avoid recomputation
+    val completedCount = remember(weeklyProgress) {
+        weeklyProgress.values.count { it }
+    }
+    
+    val dayMappings = remember {
+        listOf(
+            "Mon" to "Monday",
+            "Tue" to "Tuesday", 
+            "Wed" to "Wednesday",
+            "Thu" to "Thursday",
+            "Fri" to "Friday",
+            "Sat" to "Saturday"
+        )
+    }
+    
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -407,7 +443,7 @@ private fun ModernWeeklyProgress(weeklyProgress: Map<String, Boolean>) {
             )
             
             Text(
-                text = "${weeklyProgress.values.count { it }}/6",
+                text = "$completedCount/6",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium
@@ -416,69 +452,75 @@ private fun ModernWeeklyProgress(weeklyProgress: Map<String, Boolean>) {
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Responsive grid layout
-        BoxWithConstraints {
-            val itemWidth = (maxWidth - 40.dp) / 6 // Account for spacing
-            val itemSize = minOf(itemWidth, 44.dp)
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+        // Optimized grid layout with fixed item size
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            dayMappings.forEach { (shortDay, fullDay) ->
+                val isCompleted = weeklyProgress[fullDay] ?: false
+                
+                OptimizedDayItem(
+                    shortDay = shortDay,
+                    isCompleted = isCompleted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptimizedDayItem(
+    shortDay: String,
+    isCompleted: Boolean
+) {
+    // Fixed size to avoid layout calculations
+    val itemSize = 44.dp
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            modifier = Modifier.size(itemSize),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isCompleted) SuccessGreen else MaterialTheme.colorScheme.surfaceVariant
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isCompleted) 4.dp else 1.dp
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
-                    val isCompleted = weeklyProgress[day + "day"] ?: false
-                    
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Card(
-                            modifier = Modifier.size(itemSize),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isCompleted) SuccessGreen else MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = if (isCompleted) 4.dp else 1.dp
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isCompleted) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Completed",
-                                        tint = PureWhite,
-                                        modifier = Modifier.size((itemSize * 0.5f).coerceAtLeast(16.dp))
-                                    )
-                                } else {
-                                    Text(
-                                        text = day.take(1),
-                                        style = when {
-                                            itemSize >= 40.dp -> MaterialTheme.typography.labelLarge
-                                            else -> MaterialTheme.typography.labelMedium
-                                        },
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(6.dp))
-                        
-                        Text(
-                            text = day,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isCompleted) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                if (isCompleted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Completed",
+                        tint = PureWhite,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Text(
+                        text = shortDay.take(1),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
+        
+        Spacer(modifier = Modifier.height(6.dp))
+        
+        Text(
+            text = shortDay,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isCompleted) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -613,6 +655,19 @@ private fun ModernActiveWorkoutContent(
     completedCount: Int,
     onStartWorkout: () -> Unit
 ) {
+    // Memoize text calculations
+    val exerciseText = remember(exerciseCount) { "$exerciseCount exercises planned" }
+    val completedText = remember(completedCount, exerciseCount) { "$completedCount/$exerciseCount completed" }
+    val progressValue = remember(completedCount, exerciseCount) { 
+        if (exerciseCount > 0) completedCount.toFloat() / exerciseCount else 0f 
+    }
+    val buttonText = remember(completedCount) { 
+        if (completedCount > 0) "Continue Workout" else "Start Workout" 
+    }
+    val buttonIcon = remember(completedCount) { 
+        if (completedCount > 0) Icons.Default.PlayArrow else Icons.Default.FitnessCenter 
+    }
+    
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -621,7 +676,7 @@ private fun ModernActiveWorkoutContent(
         ) {
             Column {
                 Text(
-                    text = "$exerciseCount exercises planned",
+                    text = exerciseText,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     fontSize = 12.sp,
@@ -630,7 +685,7 @@ private fun ModernActiveWorkoutContent(
                 
                 if (completedCount > 0) {
                     Text(
-                        text = "$completedCount/$exerciseCount completed",
+                        text = completedText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -638,6 +693,7 @@ private fun ModernActiveWorkoutContent(
                 }
             }
             
+            // Simplified time badge
             Surface(
                 modifier = Modifier.clip(RoundedCornerShape(12.dp)),
                 color = MaterialTheme.colorScheme.primaryContainer
@@ -667,7 +723,7 @@ private fun ModernActiveWorkoutContent(
             Spacer(modifier = Modifier.height(12.dp))
             
             LinearProgressIndicator(
-                progress = completedCount.toFloat() / exerciseCount,
+                progress = progressValue,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -690,13 +746,13 @@ private fun ModernActiveWorkoutContent(
             shape = RoundedCornerShape(16.dp)
         ) {
             Icon(
-                imageVector = if (completedCount > 0) Icons.Default.PlayArrow else Icons.Default.FitnessCenter,
+                imageVector = buttonIcon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (completedCount > 0) "Continue Workout" else "Start Workout",
+                text = buttonText,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -735,6 +791,10 @@ private fun ModernExerciseCard(
     exercise: Exercise,
     onClick: () -> Unit
 ) {
+    // Memoize the sets and reps text to avoid string concatenation on every recomposition
+    val setsText = remember(exercise.sets) { "${exercise.sets} sets" }
+    val repsText = remember(exercise.reps) { "${exercise.reps} reps" }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -754,7 +814,7 @@ private fun ModernExerciseCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Exercise icon/indicator
+            // Exercise icon/indicator with fixed background
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -781,7 +841,8 @@ private fun ModernExerciseCard(
                     text = exercise.exerciseName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -792,34 +853,21 @@ private fun ModernExerciseCard(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 
+                // Simplified tag layout without nested Surfaces
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "${exercise.sets} sets",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    ExerciseTag(
+                        text = setsText,
+                        backgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        textColor = MaterialTheme.colorScheme.primary
+                    )
                     
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "${exercise.reps} reps",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    ExerciseTag(
+                        text = repsText,
+                        backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        textColor = MaterialTheme.colorScheme.secondary
+                    )
                 }
             }
             
@@ -830,6 +878,26 @@ private fun ModernExerciseCard(
                 modifier = Modifier.size(24.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ExerciseTag(
+    text: String,
+    backgroundColor: Color,
+    textColor: Color
+) {
+    Surface(
+        color = backgroundColor,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = textColor,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -870,6 +938,134 @@ private fun ModernErrorCard(
                     contentDescription = "Dismiss",
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileDialog(
+    user: com.google.firebase.auth.FirebaseUser?,
+    onDismiss: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Profile Photo/Avatar
+                UserAvatar(
+                    user = user,
+                    size = 80.dp,
+                    showBorder = true
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // User Info
+                user?.displayName?.let { name ->
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+                
+                user?.email?.let { email ->
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                // Profile Actions
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+
+                    // Sign Out Option
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSignOut() },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Logout,
+                                contentDescription = "Sign Out",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "Sign Out",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Close Button
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Close")
+                }
             }
         }
     }

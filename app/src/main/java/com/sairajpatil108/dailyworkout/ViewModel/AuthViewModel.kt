@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -17,6 +18,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.sairajpatil108.dailyworkout.data.WorkoutRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -27,7 +29,7 @@ data class AuthState(
     val errorMessage: String? = null
 )
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val repository: WorkoutRepository) : ViewModel() {
     var authState by mutableStateOf(AuthState())
         private set
 
@@ -37,10 +39,24 @@ class AuthViewModel : ViewModel() {
 
     init {
         // Check if user is already signed in
+        val currentUser = auth.currentUser
         authState = authState.copy(
-            isSignedIn = auth.currentUser != null,
-            user = auth.currentUser
+            isSignedIn = currentUser != null,
+            user = currentUser
         )
+        
+        // Initialize Firestore data for existing user
+        if (currentUser != null) {
+            viewModelScope.launch {
+                try {
+                    repository.initializeUserData()
+                    Log.d(TAG, "Firestore data initialized for existing user")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error initializing Firestore data for existing user: ${e.message}")
+                }
+            }
+        }
+        
         Log.d(TAG, "Initial auth state: isSignedIn=${authState.isSignedIn}")
     }
 
@@ -126,6 +142,16 @@ class AuthViewModel : ViewModel() {
             val authResult = auth.signInWithCredential(credential).await()
             
             Log.d(TAG, "Firebase authentication successful: ${authResult.user?.email}")
+            
+            // Initialize Firestore user data for new sign-in
+            try {
+                repository.initializeUserData()
+                Log.d(TAG, "Firestore user data initialized successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing Firestore user data: ${e.message}")
+                // Don't fail the sign-in process for this error
+            }
+            
             authState = authState.copy(
                 isSignedIn = true,
                 isLoading = false,
@@ -156,5 +182,16 @@ class AuthViewModel : ViewModel() {
 
     fun clearError() {
         authState = authState.copy(errorMessage = null)
+    }
+}
+
+// ViewModelFactory for AuthViewModel
+class AuthViewModelFactory(private val repository: WorkoutRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return AuthViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 } 

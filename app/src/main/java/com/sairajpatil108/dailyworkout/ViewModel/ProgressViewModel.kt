@@ -21,12 +21,11 @@ class ProgressViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
     // Reactive weekly progress that updates automatically
-    val weeklyProgress: StateFlow<Map<String, Boolean>> = flow {
-        while (true) {
-            emit(repository.getWeeklyProgress())
-            kotlinx.coroutines.delay(1000) // Check every second for updates
+    val weeklyProgress: StateFlow<Map<String, Boolean>> = repository.getWeeklyProgressFlow()
+        .onEach { progress ->
+            println("DEBUG ProgressViewModel: Weekly progress updated: $progress")
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyMap())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyMap())
 
     // Reactive weekly completion rate
     val weeklyCompletionRate: StateFlow<Float> = weeklyProgress.map { progress ->
@@ -146,6 +145,19 @@ class ProgressViewModel(
 
     fun refreshData() {
         loadProgressData()
+    }
+
+    fun forceRefreshWeeklyProgress() {
+        viewModelScope.launch {
+            try {
+                println("DEBUG ProgressViewModel: Force refreshing weekly progress...")
+                val freshWeeklyProgress = repository.getWeeklyProgress()
+                _uiState.value = _uiState.value.copy(weeklyProgress = freshWeeklyProgress)
+                println("DEBUG ProgressViewModel: Force refresh completed: $freshWeeklyProgress")
+            } catch (e: Exception) {
+                println("DEBUG ProgressViewModel: Error during force refresh: ${e.message}")
+            }
+        }
     }
 
     fun clearError() {

@@ -1,20 +1,16 @@
 package com.sairajpatil108.dailyworkout
 
 import android.app.Application
-import com.sairajpatil108.dailyworkout.data.WorkoutDatabase
+import com.sairajpatil108.dailyworkout.data.FirestoreRepository
 import com.sairajpatil108.dailyworkout.data.WorkoutRepository
 
 class WorkoutApplication : Application() {
     
-    // Database instance - lazy initialization
-    val database by lazy { WorkoutDatabase.getDatabase(this) }
+    // Firestore repository instance - lazy initialization
+    private val firestoreRepository by lazy { FirestoreRepository() }
     
-    // Repository instance - lazy initialization with database DAOs
+    // Repository instance - lazy initialization with Firestore
     val repository by lazy { 
-        WorkoutRepository(
-            workoutSessionDao = database.workoutSessionDao(),
-            exerciseProgressDao = database.exerciseProgressDao(),
-            userStatsDao = database.userStatsDao()
-        ) 
+        WorkoutRepository(firestoreRepository = firestoreRepository) 
     }
 } 

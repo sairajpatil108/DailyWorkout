@@ -19,34 +19,39 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme(
 	primary = LightPurple,
 	onPrimary = DarkBlack,
-	primaryContainer = PurpleVariant,
-	onPrimaryContainer = PureWhite,
+	primaryContainer = DarkPrimaryContainer,
+	onPrimaryContainer = Color(0xFFDDCCFF),
 	
 	secondary = LimeGreen,
 	onSecondary = DarkBlack,
-	secondaryContainer = LimeVariant,
-	onSecondaryContainer = DarkBlack,
+	secondaryContainer = DarkSecondaryContainer,
+	onSecondaryContainer = Color(0xFFE8F5B8),
 	
-	tertiary = LightPurple,
+	tertiary = Color(0xFFB3A0FF),
 	onTertiary = DarkBlack,
-	tertiaryContainer = PrimaryContainer,
-	onTertiaryContainer = PureWhite,
+	tertiaryContainer = DarkTertiaryContainer,
+	onTertiaryContainer = Color(0xFFDDCCFF),
 	
-	background = Color(0xFF1A1A1A),
-	onBackground = PureWhite,
-	surface = Color(0xFF2A2A2A),
-	onSurface = PureWhite,
-	surfaceVariant = Color(0xFF3A3A3A),
-	onSurfaceVariant = Color(0xFFE0E0E0),
+	background = DarkBackground,
+	onBackground = DarkOnSurface,
+	surface = DarkSurface,
+	onSurface = DarkOnSurface,
+	surfaceVariant = DarkSurfaceVariant,
+	onSurfaceVariant = DarkOnSurfaceVariant,
 	
-	error = ErrorRed,
-	onError = PureWhite,
-	errorContainer = Color(0xFF5C1F1F),
-	onErrorContainer = Color(0xFFFFB4AB),
+	error = Color(0xFFFF8A8A),
+	onError = DarkBlack,
+	errorContainer = DarkErrorContainer,
+	onErrorContainer = DarkErrorContent,
 	
-	outline = OnSurfaceGray,
+	outline = Color(0xFF6B7280),
 	outlineVariant = Color(0xFF4A4A4A),
-	scrim = Color(0x99000000)
+	scrim = Color(0x99000000),
+	
+	// Surface containers for better layering
+	surfaceContainer = Color(0xFF252525),
+	surfaceContainerHigh = Color(0xFF2F2F2F),
+	surfaceContainerHighest = Color(0xFF3A3A3A)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -111,8 +116,9 @@ fun DailyWorkoutTheme(
 	if (!view.isInEditMode) {
 		SideEffect {
 			val window = (view.context as Activity).window
-			window.statusBarColor = colorScheme.primary.toArgb()
-			WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+			window.statusBarColor = colorScheme.background.toArgb()
+			// Light status bars for dark theme, dark status bars for light theme
+			WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
 		}
 	}
 

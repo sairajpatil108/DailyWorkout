@@ -38,7 +38,7 @@ fun ProgressScreen(
     val streakInfo by progressViewModel.streakInfo.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxWidth()
     ) {
         // Top App Bar
         TopAppBar(
@@ -57,7 +57,7 @@ fun ProgressScreen(
                 }
             }
         )
-
+     Spacer(Modifier.height(10.dp))
         if (progressUiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -69,7 +69,7 @@ fun ProgressScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {

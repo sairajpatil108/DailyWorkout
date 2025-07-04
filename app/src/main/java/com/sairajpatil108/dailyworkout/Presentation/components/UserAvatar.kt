@@ -2,6 +2,7 @@ package com.sairajpatil108.dailyworkout.Presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -24,7 +25,8 @@ fun UserAvatar(
     user: FirebaseUser?,
     size: Dp = 48.dp,
     modifier: Modifier = Modifier,
-    showBorder: Boolean = true
+    showBorder: Boolean = true,
+    onClick: (() -> Unit)? = null
 ) {
     val cornerRadius = size / 2
     val borderModifier = if (showBorder) {
@@ -42,10 +44,17 @@ fun UserAvatar(
         Modifier
     }
     
+    val clickableModifier = if (onClick != null) {
+        Modifier.clickable { onClick() }
+    } else {
+        Modifier
+    }
+    
     Box(
         modifier = modifier
             .size(size)
             .then(borderModifier)
+            .then(clickableModifier)
     ) {
         if (user?.photoUrl != null) {
             AsyncImage(

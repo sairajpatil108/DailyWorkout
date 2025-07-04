@@ -39,7 +39,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WorkoutApp(repository: WorkoutRepository) {
 	val navController = rememberNavController()
-	val authViewModel: AuthViewModel = viewModel()
+	val authViewModel: AuthViewModel = viewModel(
+		factory = AuthViewModelFactory(repository)
+	)
 	
 	// Create ViewModels with repository
 	val workoutViewModel: WorkoutViewModel = viewModel(
